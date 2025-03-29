@@ -57,15 +57,40 @@ def statistical_analysis(df, col):
     }
 
 def perform_clustering(df, col1, col2):
-    """Performs K-Means clustering on the dataset and visualizes it with improved readability."""
+    """Performs K-Means clustering on the dataset and visualizes it with improved readability, including an elbow plot."""
     data = df[[col1, col2]].values
     scaler = StandardScaler()
     data_scaled = scaler.fit_transform(data)
 
-    # Using 4 clusters
-    kmeans = KMeans(n_clusters=4, random_state=42, n_init=10)
+    # Elbow method to determine optimal number of clusters
+    inertia = []
+    K_range = range(1, 11)  # Try cluster numbers from 1 to 10
+    for k in K_range:
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        kmeans.fit(data_scaled)
+        inertia.append(kmeans.inertia_)
+
+    # Plot the elbow plot
+    plt.figure(figsize=(8, 6))
+    plt.plot(K_range, inertia, marker='o', linestyle='-', color='b')
+    plt.title('Elbow Plot for Optimal Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Inertia (Sum of Squared Distances)')
+    plt.grid(True)
+    plt.savefig('elbow_plot.png')
+
+    # Using 4 clusters for the clustering part (can be adjusted after checking the elbow plot)
+    optimal_k = 4
+    kmeans = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
     labels = kmeans.fit_predict(data_scaled)
     df['Cluster'] = labels
+
+    # Reverse the normalization to get the original scale data
+    data_original = scaler.inverse_transform(data_scaled)
+
+    # Update the DataFrame with the original data after reverse normalization
+    df['Hours Studied Original'] = data_original[:, 0]
+    df['Performance Index Original'] = data_original[:, 1]
 
     # Define custom colors and labels
     cluster_colors = {0: 'red', 1: 'blue', 2: 'green', 3: 'orange'}
@@ -76,11 +101,12 @@ def perform_clustering(df, col1, col2):
         3: "Low Study - High Performance"
     }
 
-    # Scatter plot with improved colors and labels
+    # Scatter plot with improved colors and labels using original data
     plt.figure(figsize=(8, 6))
     for cluster, color in cluster_colors.items():
         subset = df[df['Cluster'] == cluster]
-        plt.scatter(subset[col1], subset[col2], c=color, label=cluster_labels[cluster], edgecolors='black', alpha=0.7)
+        plt.scatter(subset['Hours Studied Original'], subset['Performance Index Original'], 
+                    c=color, label=cluster_labels[cluster], edgecolors='black', alpha=0.7)
 
     plt.title(f'Clustering of {col1} vs {col2}')
     plt.xlabel(col1)
