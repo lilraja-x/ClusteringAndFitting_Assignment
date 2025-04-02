@@ -107,29 +107,70 @@ def statistical_analysis(df, col):
 def perform_clustering(df, col1, col2):
     """
     Performs K-Means clustering on the dataset and visualizes the results.
-    Also generates an elbow plot for optimal cluster selection.
+    Generates both an elbow plot and a clustering plot.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    col1 (str): Column name for the first feature.
+    col2 (str): Column name for the second feature.
+    
+    Returns:
+    pd.DataFrame: The DataFrame with an additional 'Cluster' column.
     """
     data = df[[col1, col2]].values
     scaler = StandardScaler()
     data_scaled = scaler.fit_transform(data)
+
     inertia = []
     K_range = range(1, 11)
+
     for k in K_range:
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
         kmeans.fit(data_scaled)
         inertia.append(kmeans.inertia_)
+
+    # Elbow Plot
     plt.figure(figsize=(8, 6))
-    plt.plot(K_range, inertia, marker='o', linestyle='-', color='b')
+    plt.plot(K_range, inertia, marker='o', linestyle='-', color='b', label='Inertia (Distortion Score)')
+    plt.axvline(x=4, linestyle='--', color='red', label='Optimal Cluster (k=4)')
     plt.title('Elbow Plot for Optimal Number of Clusters')
     plt.xlabel('Number of Clusters')
     plt.ylabel('Inertia (Sum of Squared Distances)')
+    plt.legend()
     plt.grid(True)
     plt.savefig('elbow_plot.png')
+    plt.show()
+
+    # Apply K-Means with optimal k (assumed 4)
     optimal_k = 4
     kmeans = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
     df['Cluster'] = kmeans.fit_predict(data_scaled)
-    return df
 
+    # Define meaningful labels for clusters
+    cluster_labels = {
+        0: "Low Performance",
+        1: "High Performance",
+        2: "Moderate Performance",
+        3: "Struggling"
+    }
+
+    # Cluster Plot
+    plt.figure(figsize=(8, 6))
+    sns.scatterplot(x=df[col1], y=df[col2], hue=df['Cluster'], palette="deep", legend="full")
+
+    # Update legend labels
+    handles, labels = plt.gca().get_legend_handles_labels()
+    new_labels = [cluster_labels[int(label)] for label in labels if label.isdigit()]
+    plt.legend(handles, new_labels, title="Cluster Categories")
+
+    plt.title("Clustering Plot of Study Hours vs Performance Index")
+    plt.xlabel("Hours Studied")
+    plt.ylabel("Performance Index")
+    plt.grid(True)
+    plt.savefig("clustering_plot.png")
+    plt.show()
+
+    return df
 
 def perform_fitting(df, col1, col2):
     """
