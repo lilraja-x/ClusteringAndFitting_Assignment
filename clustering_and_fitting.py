@@ -5,20 +5,37 @@ import seaborn as sns
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import silhouette_score, davies_bouldin_score, mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score
 import scipy.stats as ss
+
 
 df = pd.read_csv('data.csv')
 
+
 def plot_relational_plot(df):
-    """Creates and saves a scatter plot of Hours Studied vs. Performance Index."""
+    """
+    Creates and saves a scatter plot of Hours Studied vs. Performance Index.
+    The plot includes an improved legend for better readability.
+    """
+    df['Extracurricular Activities'] = df['Extracurricular Activities'].map({
+        1: 'Yes', 0: 'No'
+    }).astype(str)
+
     plt.figure(figsize=(8, 6))
-    sns.scatterplot(data=df, x='Hours Studied', y='Performance Index', hue='Extracurricular Activities')
+    scatter = sns.scatterplot(
+        data=df, x='Hours Studied', y='Performance Index',
+        hue='Extracurricular Activities'
+    )
+    handles, labels = scatter.get_legend_handles_labels()
+    new_labels = ['No Extracurricular Activities (0)',
+                  'Participates in Extracurricular Activities (1)']
+    plt.legend(handles, new_labels, title='Extracurricular Activities')
     plt.title('Hours Studied vs Performance Index')
     plt.xlabel('Hours Studied')
     plt.ylabel('Performance Index')
     plt.grid(True)
     plt.savefig('relational_plot.png')
+
 
 def plot_categorical_plot(df):
     """Creates and saves a bar plot of students participating in extracurricular activities."""
@@ -30,22 +47,46 @@ def plot_categorical_plot(df):
     plt.grid(True)
     plt.savefig('categorical_plot.png')
 
+
 def plot_statistical_plot(df):
-    """Creates and saves a correlation heatmap of numerical features."""
+    """
+    Creates and saves a correlation heatmap for numerical features.
+    The heatmap visually represents feature correlations.
+    """
     plt.figure(figsize=(8, 6))
     sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', fmt=".2f")
     plt.title('Correlation Heatmap')
     plt.savefig('statistical_plot.png')
 
-def statistical_analysis(df, col):
-    """Performs statistical analysis (mean, stddev, skewness, kurtosis, normality test)."""
-    mean = df[col].mean()
-    stddev = df[col].std()
-    skew = df[col].skew()
-    excess_kurtosis = df[col].kurtosis()
 
-    stat, p_value = ss.shapiro(df[col])
+def statistical_analysis(df, col):
+    """
+    Computes statistical properties of a column such as mean, stddev,
+    skewness, kurtosis, and normality test results.
+    """
+    mean = float(df[col].mean())
+    stddev = float(df[col].std())
+    skew = float(df[col].skew())
+    excess_kurtosis = float(df[col].kurtosis())
+
+    # Normality Test - Use Shapiro-Wilk only if N ≤ 5000, otherwise use Kolmogorov-Smirnov
+    if len(df[col]) <= 5000:
+        stat, p_value = ss.shapiro(df[col])
+        test_used = "Shapiro-Wilk Test"
+    else:
+        stat, p_value = ss.kstest(df[col], 'norm', args=(mean, stddev))
+        test_used = "Kolmogorov-Smirnov Test"
+
     normality = "Normally distributed" if p_value > 0.05 else "Not normally distributed"
+
+    # Print the results in a structured format
+    print(f"Stats for {col}:")
+    print(f"  Mean: {mean:.4f}")
+    print(f"  Std Dev: {stddev:.4f}")
+    print(f"  Skewness: {skew:.6f}")
+    print(f"  Excess Kurtosis: {excess_kurtosis:.5f}")
+    print(f"  {test_used} p-value: {p_value:.6e}")
+    print(f"  Normality: {normality}\n")
 
     return {
         'mean': mean,
@@ -56,21 +97,22 @@ def statistical_analysis(df, col):
         'normality': normality
     }
 
+
+
 def perform_clustering(df, col1, col2):
-    """Performs K-Means clustering on the dataset and visualizes it with improved readability, including an elbow plot."""
+    """
+    Performs K-Means clustering on the dataset and visualizes the results.
+    Also generates an elbow plot for optimal cluster selection.
+    """
     data = df[[col1, col2]].values
     scaler = StandardScaler()
     data_scaled = scaler.fit_transform(data)
-
-    # Elbow method to determine optimal number of clusters
     inertia = []
-    K_range = range(1, 11)  # Try cluster numbers from 1 to 10
+    K_range = range(1, 11)
     for k in K_range:
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
         kmeans.fit(data_scaled)
         inertia.append(kmeans.inertia_)
-
-    # Plot the elbow plot
     plt.figure(figsize=(8, 6))
     plt.plot(K_range, inertia, marker='o', linestyle='-', color='b')
     plt.title('Elbow Plot for Optimal Number of Clusters')
@@ -78,60 +120,24 @@ def perform_clustering(df, col1, col2):
     plt.ylabel('Inertia (Sum of Squared Distances)')
     plt.grid(True)
     plt.savefig('elbow_plot.png')
-
-    # Using 4 clusters for the clustering part (can be adjusted after checking the elbow plot)
     optimal_k = 4
     kmeans = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
-    labels = kmeans.fit_predict(data_scaled)
-    df['Cluster'] = labels
-
-    # Reverse the normalization to get the original scale data
-    data_original = scaler.inverse_transform(data_scaled)
-
-    # Update the DataFrame with the original data after reverse normalization
-    df['Hours Studied Original'] = data_original[:, 0]
-    df['Performance Index Original'] = data_original[:, 1]
-
-    # Define custom colors and labels
-    cluster_colors = {0: 'red', 1: 'blue', 2: 'green', 3: 'orange'}
-    cluster_labels = {
-        0: "Low Study - Low Performance",
-        1: "Moderate Study - Moderate Performance",
-        2: "High Study - High Performance",
-        3: "Low Study - High Performance"
-    }
-
-    # Scatter plot with improved colors and labels using original data
-    plt.figure(figsize=(8, 6))
-    for cluster, color in cluster_colors.items():
-        subset = df[df['Cluster'] == cluster]
-        plt.scatter(subset['Hours Studied Original'], subset['Performance Index Original'], 
-                    c=color, label=cluster_labels[cluster], edgecolors='black', alpha=0.7)
-
-    plt.title(f'Clustering of {col1} vs {col2}')
-    plt.xlabel(col1)
-    plt.ylabel(col2)
-    plt.legend(title="Clusters", fontsize=10)
-    plt.grid(True)
-    plt.savefig('clustering_plot.png')
-
+    df['Cluster'] = kmeans.fit_predict(data_scaled)
     return df
 
 
-
 def perform_fitting(df, col1, col2):
-    """Performs Linear and Polynomial Regression and evaluates their performance."""
+    """
+    Performs Linear and Polynomial Regression on the given dataset.
+    Evaluates and plots both models to compare their performances.
+    """
     X = df[[col1]].values
     y = df[col2].values
-
-    # Linear Regression
     lin_model = LinearRegression()
     lin_model.fit(X, y)
     y_pred_linear = lin_model.predict(X)
     r2_linear = r2_score(y, y_pred_linear)
     rmse_linear = np.sqrt(mean_squared_error(y, y_pred_linear))
-
-    # Polynomial Regression (Degree 2)
     poly = PolynomialFeatures(degree=2)
     X_poly = poly.fit_transform(X)
     poly_model = LinearRegression()
@@ -139,45 +145,37 @@ def perform_fitting(df, col1, col2):
     y_pred_poly = poly_model.predict(X_poly)
     r2_poly = r2_score(y, y_pred_poly)
     rmse_poly = np.sqrt(mean_squared_error(y, y_pred_poly))
-
-    print(f"Linear Regression: R² = {r2_linear:.3f}, RMSE = {rmse_linear:.3f}")
-    print(f"Polynomial Regression (Degree 2): R² = {r2_poly:.3f}, RMSE = {rmse_poly:.3f}")
-
     plt.figure(figsize=(8, 6))
     plt.scatter(X, y, color='gray', label='Actual Data')
     plt.plot(X, y_pred_linear, color='red', label='Linear Fit')
-    plt.plot(X, y_pred_poly, color='blue', linestyle='dashed', label='Polynomial Fit (Degree 2)')
+    plt.plot(X, y_pred_poly, color='blue', linestyle='dashed',
+             label='Polynomial Fit (Degree 2)')
     plt.title(f'Fitting: {col1} vs {col2}')
     plt.xlabel(col1)
     plt.ylabel(col2)
     plt.legend()
     plt.grid(True)
     plt.savefig('fitting_plot.png')
-
     return r2_linear, r2_poly, rmse_linear, rmse_poly
 
+
 def main():
+    """
+    Main function to execute data analysis pipeline.
+    Reads data, performs statistical analysis, clustering, and regression fitting.
+    """
     df = pd.read_csv('data.csv')
-
     df['Extracurricular Activities'] = df['Extracurricular Activities'].map({'Yes': 1, 'No': 0})
-
+    print(df.head())
     col = 'Performance Index'
     stats = statistical_analysis(df, col)
-    print(f"Stats for {col}:")
-    print(f"mean: {stats['mean']}")
-    print(f"stddev: {stats['stddev']}")
-    print(f"skew: {stats['skew']}")
-    print(f"excess_kurtosis: {stats['excess_kurtosis']}")
-    print(f"p_value: {stats['p_value']}")
-    print(f"normality: {stats['normality']}")
-
+    # print(f"Stats for {col}: {stats}")
     plot_relational_plot(df)
     plot_categorical_plot(df)
     plot_statistical_plot(df)
-
     df = perform_clustering(df, 'Hours Studied', 'Performance Index')
-
     perform_fitting(df, 'Hours Studied', 'Performance Index')
+
 
 if __name__ == '__main__':
     main()
