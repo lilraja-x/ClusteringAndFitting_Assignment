@@ -80,6 +80,11 @@ def statistical_analysis(df, col):
     normality = "Normally distributed" if p_value > 0.05 else "Not normally distributed"
 
     # Print the results in a structured format
+    print("\n")
+    print('describe', '\n', df[col].describe(), '\n')
+    print('correlation', '\n',  df.corr(), '\n')
+    print('head', '\n',  df.head(), '\n')
+    print('tail', '\n',  df.tail(), '\n')
     print(f"Stats for {col}:")
     print(f"  Mean: {mean:.4f}")
     print(f"  Std Dev: {stddev:.4f}")
@@ -169,7 +174,6 @@ def main():
     print(df.head())
     col = 'Performance Index'
     stats = statistical_analysis(df, col)
-    # print(f"Stats for {col}: {stats}")
     plot_relational_plot(df)
     plot_categorical_plot(df)
     plot_statistical_plot(df)
