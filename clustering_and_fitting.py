@@ -9,6 +9,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 import scipy.stats as ss
 
 
+
 df = pd.read_csv('data.csv')
 
 
